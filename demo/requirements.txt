@@ -1,0 +1,24 @@
+# demo/ requirements
+# Install with:  pip install -r demo/requirements.txt
+#
+# Target environment: CAI Workbench, Python 3.10, Spark 3.3.0 (pre-installed)
+# GPU instance:  g5.4xlarge (NVIDIA A10G)
+
+# ETL and datagen scripts use PySpark only (Spark 3.3.0 is pre-installed in CAI,
+# so pyspark here just ensures the Python bindings are present in the venv)
+pyspark==3.3.0
+
+# RAPIDS Qualification Tool CLI  (spark_rapids qualification ...)
+# v26.x is compatible with Spark 3.3.0 event logs
+spark-rapids-user-tools==26.2.0
+
+# spark-rapids-user-tools requires numpy>=2.2.6.  Its shap dependency pulls in
+# matplotlib, and matplotlib <3.9 has C extensions compiled against NumPy 1.x
+# which crash on import with NumPy 2.x (_ARRAY_API not found).
+# Pinning matplotlib>=3.9 gets a NumPy-2.x-compatible build.
+numpy>=2.2.6
+matplotlib>=3.9
+
+# Pulled in by spark-rapids-user-tools; pinned here to avoid accidental downgrades
+pandas>=1.5,<3
+pyarrow>=12
