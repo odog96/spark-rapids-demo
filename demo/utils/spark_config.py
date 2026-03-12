@@ -71,15 +71,24 @@ GPU_PROFILES = {
 }
 
 # RAPIDS plugin configs shared across all GPU types
+#
+# JAR: rapids-4-spark_2.12-24.08.0-cuda12.jar
+#   - 24.08.0 is the last RAPIDS release to support Spark 3.3.x
+#   - cuda12 variant required (CUDA 12.5 toolkit on g5.4xlarge CAI image)
+#   - Download: https://repo1.maven.org/maven2/com/nvidia/rapids-4-spark_2.12/
+#               24.08.0/rapids-4-spark_2.12-24.08.0-cuda12.jar
+#   - Place at: /home/cdsw/jars/rapids-4-spark_2.12-24.08.0-cuda12.jar
+#     (or override via RAPIDS_JAR env var)
+_RAPIDS_JAR = os.environ.get(
+    "RAPIDS_JAR",
+    "/home/cdsw/jars/rapids-4-spark_2.12-24.08.0-cuda12.jar",
+)
+
 _RAPIDS_CORE_CONFIGS = {
     "spark.plugins": "com.nvidia.spark.SQLPlugin",
-    # Spark 3.3.0 shim – update if you upgrade the Spark runtime
-    "spark.rapids.shims-provider-override": (
-        "com.nvidia.spark.rapids.shims.spark330.SparkShimServiceProvider"
-    ),
+    "spark.jars": _RAPIDS_JAR,
     "spark.rapids.sql.enabled": "true",
     "spark.rapids.sql.incompatibleOps.enabled": "true",
-    "spark.rapids.sql.udfCompiler.enabled": "true",
     "spark.rapids.sql.variableFloatAgg.enabled": "true",
     "spark.rapids.sql.castFloatToString.enabled": "true",
     "spark.rapids.sql.castStringToFloat.enabled": "true",
@@ -92,7 +101,7 @@ _RAPIDS_CORE_CONFIGS = {
     # Performance
     "spark.locality.wait": "0",
     "spark.sql.adaptive.enabled": "true",
-    # GPU executor discovery script (standard path in CAI Workbench)
+    # GPU executor discovery script (confirmed path on CAI Workbench Spark 3.3.0 runtime)
     "spark.executor.resource.gpu.discoveryScript": "/runtime-addons/spark330-24.1-h1-ga3qav/opt/spark/examples/src/main/scripts/getGpusResources.sh",
     "spark.executor.resource.gpu.vendor": "nvidia.com",
 }
