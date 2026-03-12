@@ -1,7 +1,7 @@
 # CLAUDE.md – Project Status & Working Notes
 
 ## Project
-**CAI_Rapids_Articles** – Spark RAPIDS demo for IQVIA customer engagement
+**CAI_Rapids_Articles** – Spark RAPIDS CPU vs GPU benchmark demo
 Cloudera AI (CAI) Workbench 2.0.53, CDP Public Cloud 7.3.1, Spark 3.3.0 DEX CDE 1.24
 
 ## Target Environment
@@ -76,7 +76,7 @@ Created `demo/` with clean sub-directories. Original folders preserved as refere
 
 - [x] **DATA_STORAGE / Kerberos**: `spark.kerberos.access.hadoopFileSystems` IS needed
       for `s3a://` paths on CDP. Already handled conditionally in `_storage_config()`.
-      No code change needed. Set `DATA_STORAGE=s3a://iqvia-cbpoc-buk-5762ce93/rapids-demo`
+      No code change needed. Set `DATA_STORAGE=s3a://<your-bucket>/rapids-demo`
       in CAI project environment variables.
 
 - [x] **RAPIDS jar version**: correct version is **24.08.0-cuda12** (not 25.08.0).
@@ -88,7 +88,7 @@ Created `demo/` with clean sub-directories. Original folders preserved as refere
 
 - Run from a **CPU-only CAI session** (GPU session holds the GPU; benchmark subprocesses
   need to claim it themselves)
-- Set `DATA_STORAGE=s3a://iqvia-cbpoc-buk-5762ce93/rapids-demo` in project env vars
+- Set `DATA_STORAGE=s3a://<your-bucket>/rapids-demo` in project env vars
   (or use `/tmp/rapids-demo` for local testing)
 - Run `demo/datagen/retail_datagen.py --scale 10` to generate test data
 - Run `demo/benchmark/run_benchmark.py --mode cpu --scale 1` for a quick CPU smoke-test
