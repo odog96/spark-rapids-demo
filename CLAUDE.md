@@ -84,15 +84,34 @@ Created `demo/` with clean sub-directories. Original folders preserved as refere
       JAR downloaded to `/home/cdsw/jars/rapids-4-spark_2.12-24.08.0-cuda12.jar`.
       `spark.jars` config added to `spark_config.py`. Override path via `RAPIDS_JAR` env var.
 
+- [x] **Session OOM / "session failed" when running benchmark**: Root cause is
+      `spark.driver.memory=8g` in a CAI session with only 8 GB RAM. In `local[*]`
+      mode the CAI session container IS the Spark cluster — there are no separate
+      workers. The JVM cannot allocate 8 GB heap when the container only has 8 GB
+      total (OS + Python + JupyterLab consume ~1-2 GB overhead).
+      **Fix applied (2026-03-12)**: default driver memory lowered to `4g` via
+      `_SPARK_DRIVER_MEM = os.environ.get("SPARK_DRIVER_MEMORY", "4g")` in
+      `demo/utils/spark_config.py`. Override at runtime:
+      `SPARK_DRIVER_MEMORY=10g python demo/benchmark/run_benchmark.py ...`
+      Use 4g for 8 GB sessions; 8-10g for 16+ GB sessions.
+      Note: `spark.executor.memory` / `spark.executor.cores` / `spark.executor.instances`
+      are all ignored in `local[*]` mode — only driver memory matters.
+
 ## Next Steps (if needed)
 
-- Run from a **CPU-only CAI session** (GPU session holds the GPU; benchmark subprocesses
-  need to claim it themselves)
-- Set `DATA_STORAGE=s3a://<your-bucket>/rapids-demo` in project env vars
-  (or use `/tmp/rapids-demo` for local testing)
-- Run `demo/datagen/retail_datagen.py --scale 10` to generate test data
-- Run `demo/benchmark/run_benchmark.py --mode cpu --scale 1` for a quick CPU smoke-test
-- Run full `--mode both --scale 10` for the customer demo
+- **NEXT ACTION**: Start a new CAI session with **16+ GB RAM**, then run:
+  ```
+  export DATA_STORAGE=/home/cdsw/rapids-demo-data
+  SPARK_DRIVER_MEMORY=10g python demo/benchmark/run_benchmark.py --mode cpu --scale 10
+  ```
+  Data is already generated at `/home/cdsw/rapids-demo-data/retail/` (scale 1 run).
+  For scale 10 add `--generate-data` to regenerate at the larger scale.
+
+- Scale 1 CPU smoke-test passed (2026-03-12) on 4 vCPU / 8 GB session.
+- After CPU scale 10 passes, run `--mode both --scale 10` for the full CPU vs GPU comparison.
+- GPU benchmark (`--mode gpu` or `--mode both`) **must run from a GPU session** in CAI
+  Workbench — CPU sessions have `NVIDIA_VISIBLE_DEVICES=void` (no GPU device mounted).
+  CPU-only benchmark (`--mode cpu`) can run from any session.
 - Add a Jupyter notebook wrapper if the customer prefers notebook-first demo
 - Wire up Agent Studio workflow YAML once the production schema is confirmed
 

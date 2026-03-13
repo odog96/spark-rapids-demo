@@ -87,6 +87,12 @@ _RAPIDS_JAR = os.environ.get(
 _RAPIDS_CORE_CONFIGS = {
     "spark.plugins": "com.nvidia.spark.SQLPlugin",
     "spark.jars": _RAPIDS_JAR,
+    # Force the 330cdh shim so RAPIDS accepts Cloudera hotfix build strings like
+    # 3.3.0.1.24.7216.0-76 that don't match the exact version patterns baked into
+    # the JAR's auto-detection logic.
+    "spark.rapids.shims-provider-override": (
+        "com.nvidia.spark.rapids.shims.spark330cdh.SparkShimServiceProvider"
+    ),
     "spark.rapids.sql.enabled": "true",
     "spark.rapids.sql.incompatibleOps.enabled": "true",
     "spark.rapids.sql.variableFloatAgg.enabled": "true",
@@ -107,11 +113,18 @@ _RAPIDS_CORE_CONFIGS = {
 }
 
 # CPU session tuning (no GPU, no RAPIDS)
+#
+# NOTE: In local[*] mode (used when DATA_STORAGE is a local path), the Spark
+# driver and executor share the same JVM process, so only spark.driver.memory
+# applies. Set SPARK_DRIVER_MEMORY to override — use 4g or less for sessions
+# with 8 GB RAM, 8g+ for sessions with 16 GB+ RAM.
+_SPARK_DRIVER_MEM = os.environ.get("SPARK_DRIVER_MEMORY", "10g")
+
 _CPU_CONFIGS = {
-    "spark.executor.memory": "16g",
-    "spark.executor.memoryOverhead": "2g",
-    "spark.executor.cores": "4",
-    "spark.driver.memory": "8g",
+    "spark.executor.memory": "16g",       # ignored in local mode
+    "spark.executor.memoryOverhead": "2g", # ignored in local mode
+    "spark.executor.cores": "4",           # ignored in local mode
+    "spark.driver.memory": _SPARK_DRIVER_MEM,
     "spark.dynamicAllocation.enabled": "true",
     "spark.sql.adaptive.enabled": "true",
     "spark.sql.files.maxPartitionBytes": "256m",
@@ -125,6 +138,22 @@ def _storage_config() -> dict:
     if storage.startswith("s3a://"):
         return {"spark.kerberos.access.hadoopFileSystems": storage}
     return {}
+
+
+def _master_config() -> dict:
+    """
+    Return {"spark.master": "local[*]"} when running against a local data path.
+
+    On distributed clusters (YARN, CDE, k8s) data lives in S3/HDFS, so we
+    don't override the master and let spark-defaults.conf take effect.
+    For local /tmp testing the executors must run in-process so they share
+    the driver's filesystem — otherwise writes go to ephemeral executor pods
+    and only the _SUCCESS marker survives.
+    """
+    storage = os.environ.get("DATA_STORAGE", "/tmp/rapids-demo")
+    if storage.startswith("s3a://") or storage.startswith("hdfs://"):
+        return {}
+    return {"spark.master": os.environ.get("SPARK_MASTER", "local[*]")}
 
 
 def get_cpu_session(app_name: str = "SparkRAPIDS-CPU-Benchmark",
@@ -144,7 +173,7 @@ def get_cpu_session(app_name: str = "SparkRAPIDS-CPU-Benchmark",
     SparkSession
     """
     builder = SparkSession.builder.appName(app_name)
-    configs = {**_CPU_CONFIGS, **_storage_config()}
+    configs = {**_master_config(), **_CPU_CONFIGS, **_storage_config()}
     if extra_configs:
         configs.update(extra_configs)
     for k, v in configs.items():
@@ -180,10 +209,11 @@ def get_gpu_session(app_name: str = "SparkRAPIDS-GPU-Benchmark",
 
     profile = GPU_PROFILES[gpu]
     configs = {
+        **_master_config(),
         **_RAPIDS_CORE_CONFIGS,
         **profile,
         **_storage_config(),
-        "spark.driver.memory": "8g",
+        "spark.driver.memory": _SPARK_DRIVER_MEM,
         "spark.sql.adaptive.enabled": "true",
     }
 

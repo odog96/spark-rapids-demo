@@ -119,10 +119,20 @@ spark-rapids-ml/
 
 ### 1. Prerequisites
 
-**Run all benchmark scripts from a CPU-only CAI session.**
-A GPU session holds exclusive access to the GPU. The benchmark scripts launch Spark
-as subprocesses, and each subprocess needs to claim the GPU independently. If you run
-from a GPU session you will get resource allocation conflicts.
+**Session type depends on which benchmark mode you are running:**
+
+- **CPU-only benchmark** (`--mode cpu`): run from a CPU or GPU session. A CPU session
+  is fine and cheaper.
+- **GPU benchmark** (`--mode gpu` or `--mode both`): **must run from a GPU session.**
+  In CAI Workbench (Kubernetes), the NVIDIA GPU device is only mounted into GPU session
+  pods. CPU session pods have `NVIDIA_VISIBLE_DEVICES=void` — CUDA is completely
+  inaccessible regardless of which JARs are installed. The benchmark launches Spark as
+  subprocesses inside the same container, so they inherit whatever GPU access the
+  session has.
+
+> **Note:** the earlier advice to "use a CPU session to avoid resource conflicts" applies
+> only to distributed cluster deployments (YARN/CDE). In `local[*]` mode there is no
+> resource scheduler, so no GPU scheduling conflict can occur.
 
 ```bash
 # Install Python dependencies (once per environment)
